@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Trust No One, one line at a time</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,600;1,6..72,400&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#efe9dc; --surface:#fffdf7; --sunk:#e3dac6;
+  --ink:#1b1720; --body:#302a35; --muted:#6f6678; --rule:#d5cab2;
+  --gold:#9a7410; --goldlit:#c8951a; --lie:#a83f68; --ok:#2f7d5c;
+  --code-bg:#191622; --code-ink:#e4dfd4; --code-dim:#7c748a; --note-ink:#9c92b4;
+  --add:#3f9d6b; --add-bg:rgba(63,157,107,.13); --del:#c2506e; --del-bg:rgba(194,80,110,.11);
+  --del-ink:#a8788a; --comment:#93b06a;
+  /* the code panel is dark in both themes, so these do not change with it */
+  --t-kw:#c792ea; --t-str:#e0a15e; --t-num:#7fd3e0; --t-fn:#79b8ff; --t-con:#e8bf46; --t-lib:#5ecfc0;
+  --shadow:0 1px 0 rgba(27,23,32,.05), 0 10px 34px -22px rgba(27,23,32,.6);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#14121a; --surface:#1d1a26; --sunk:#0f0d15;
+    --ink:#f2ede2; --body:#d5cec3; --muted:#8f86a0; --rule:#2b2537;
+    --gold:#e8bf46; --goldlit:#f0c83c; --lie:#e08bb0; --ok:#63c79c;
+    --code-bg:#100e17; --code-ink:#e4dfd4; --code-dim:#6f6782; --note-ink:#a99cc0;
+    --add:#4fc98a; --add-bg:rgba(79,201,138,.13); --del:#e0708f; --del-bg:rgba(224,112,143,.11);
+    --del-ink:#c08a9c; --comment:#93b06a;
+    --t-kw:#c792ea; --t-str:#e0a15e; --t-num:#7fd3e0; --t-fn:#79b8ff; --t-con:#e8bf46; --t-lib:#5ecfc0;
+    --shadow:0 1px 0 rgba(0,0,0,.5), 0 12px 36px -24px #000;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14121a; --surface:#1d1a26; --sunk:#0f0d15;
+  --ink:#f2ede2; --body:#d5cec3; --muted:#8f86a0; --rule:#2b2537;
+  --gold:#e8bf46; --goldlit:#f0c83c; --lie:#e08bb0; --ok:#63c79c;
+  --code-bg:#100e17; --code-ink:#e4dfd4; --code-dim:#6f6782; --note-ink:#a99cc0;
+  --add:#4fc98a; --add-bg:rgba(79,201,138,.13); --del:#e0708f; --del-bg:rgba(224,112,143,.11);
+  --del-ink:#c08a9c; --comment:#93b06a;
+  --t-kw:#c792ea; --t-str:#e0a15e; --t-num:#7fd3e0; --t-fn:#79b8ff; --t-con:#e8bf46; --t-lib:#5ecfc0;
+  --shadow:0 1px 0 rgba(0,0,0,.5), 0 12px 36px -24px #000;
+}
+*{box-sizing:border-box}
+html,body{height:100%; margin:0; overflow:hidden}
+body{
+  background:var(--bg); color:var(--body);
+  font-family:"Newsreader",Georgia,serif; font-size:17px; line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+button{font:inherit}
+:focus-visible{outline:2px solid var(--gold); outline-offset:2px}
+
+/* ---------- the whole app is one screen, and only panes scroll ---------- */
+.app{height:100dvh; display:grid; grid-template-rows:auto minmax(0,1fr);
+     grid-template-columns:minmax(0,1fr);   /* or the single implicit column grows to fit the widest code line */
+     gap:0; overflow:hidden}
+
+.bar{
+  display:flex; min-width:0; align-items:center; gap:14px; padding:9px 16px;
+  border-bottom:1px solid var(--rule); background:var(--surface); min-height:0;
+}
+.brand{
+  font-family:"Silkscreen",monospace; font-size:12px; color:var(--ink);
+  letter-spacing:.02em; white-space:nowrap; flex:0 0 auto;
+}
+.brand span{color:var(--gold); display:block; font-size:9px; letter-spacing:.1em; margin-top:2px}
+.rail{display:flex; gap:5px; overflow-x:auto; flex:1 1 auto; padding:3px 0; scrollbar-width:thin}
+.chip{
+  flex:0 0 auto; font-family:"JetBrains Mono",monospace; font-size:11px; padding:6px 9px;
+  border-radius:2px; cursor:pointer; background:transparent; color:var(--muted);
+  border:1px solid var(--rule); white-space:nowrap;
+}
+.chip:hover{color:var(--ink); border-color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--ink); color:var(--bg); border-color:var(--ink)}
+.helpbtns{display:flex; gap:5px; flex:0 0 auto}
+.helpbtns button{
+  font-family:"JetBrains Mono",monospace; font-size:11px; padding:6px 9px; border-radius:2px;
+  background:transparent; border:1px solid var(--rule); color:var(--muted); cursor:pointer;
+}
+.helpbtns button:hover{color:var(--ink); border-color:var(--muted)}
+
+/* ---------- the two panes ---------- */
+.split{
+  display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);
+  /* the longest line in the game is 121 characters; the game only needs 3:2 */
+  gap:14px; padding:14px 16px; min-height:0; min-width:0; overflow:hidden;
+}
+.pane{
+  background:var(--surface); border:1px solid var(--rule); border-radius:3px;
+  box-shadow:var(--shadow); display:grid; grid-template-rows:auto auto auto minmax(0,1fr);
+  min-height:0; min-width:0;
+}
+.pane-head{display:flex; align-items:baseline; gap:12px; padding:11px 15px 9px; border-bottom:1px solid var(--rule); flex-wrap:wrap}
+.stepno{font-family:"Silkscreen",monospace; font-size:10px; color:var(--gold); letter-spacing:.09em}
+h1{font-family:"Silkscreen",monospace; font-size:15px; color:var(--ink); margin:0; line-height:1.25}
+.why{padding:11px 15px 12px; margin:0; border-bottom:1px solid var(--rule); font-size:16px; max-height:31vh; overflow:auto}
+.why b{color:var(--ink); font-weight:600}
+code{font-family:"JetBrains Mono",monospace; font-size:.84em; background:var(--sunk); padding:1px 4px; border-radius:2px; color:var(--ink)}
+.legend{
+  display:flex; gap:13px; align-items:center; padding:7px 15px; flex-wrap:wrap;
+  font-family:"JetBrains Mono",monospace; font-size:10px; color:var(--muted);
+  border-bottom:1px solid var(--rule);
+}
+.swatch{display:inline-block; width:9px; height:9px; vertical-align:-1px; margin-right:5px}
+.swatch.add{background:var(--add)}
+.swatch.del{background:var(--del)}
+.swatch.com{background:var(--comment)}
+.legend .rw{color:var(--lie)}
+.code{background:var(--code-bg); overflow:auto; min-width:0; border-radius:0 0 3px 3px; padding:10px 0 14px; min-height:0}
+.ln{display:grid; grid-template-columns:46px minmax(0,1fr); align-items:start}
+.ln .num{
+  font-family:"JetBrains Mono",monospace; font-size:10px; color:var(--code-dim); text-align:right;
+  padding-right:8px; padding-top:3px; user-select:none; font-variant-numeric:tabular-nums;
+  position:sticky; left:0; background:var(--code-bg);
+}
+.ln .src{font-family:"JetBrains Mono",monospace; font-size:12px; line-height:1.7; color:var(--code-ink); white-space:pre; padding-right:16px}
+.ln.add{background:var(--add-bg); border-left:2px solid var(--add); margin-left:-2px}
+.ln.add .num{color:var(--add)}
+.ln.add .num::after{content:"+"; margin-left:3px}
+.ln.del{background:var(--del-bg); border-left:2px solid var(--del); margin-left:-2px}
+.ln.del .src{color:var(--del-ink); text-decoration:line-through; text-decoration-color:rgba(224,112,143,.35)}
+.ln.del .num{color:var(--del)}
+.ln.same .num{color:var(--code-dim)}
+.ln.same .num[data-step]{cursor:pointer}
+.ln.same .num[data-step]:hover{color:var(--gold); text-decoration:underline}
+.src .t-com{color:var(--comment); font-style:italic}
+.src .t-kw{color:var(--t-kw)}
+.src .t-str{color:var(--t-str)}
+.src .t-num{color:var(--t-num)}
+.src .t-fn{color:var(--t-fn)}
+.src .t-con{color:var(--t-con)}
+.src .t-lib{color:var(--t-lib)}
+.src .t-var{color:var(--code-ink)}
+.src .id{cursor:help}
+.src .id:hover{filter:brightness(1.35)}
+#hint{
+  position:fixed; z-index:50; max-width:340px; pointer-events:none; opacity:0;
+  transition:opacity .09s; background:var(--surface); color:var(--body);
+  border:1px solid var(--rule); border-radius:3px; box-shadow:var(--shadow); padding:10px 12px;
+}
+#hint[data-show="1"]{opacity:1}
+#hint .h{font-family:"JetBrains Mono",monospace; font-size:12px; color:var(--ink); font-weight:700}
+#hint .h em{font-style:normal; color:var(--gold); font-weight:400}
+#hint .k{font-family:"Silkscreen",monospace; font-size:8px; letter-spacing:.09em; color:var(--muted); text-transform:uppercase; margin-left:6px}
+#hint p{margin:6px 0 0; font-size:14.5px; line-height:1.45}
+#hint dl{margin:7px 0 0; font-family:"JetBrains Mono",monospace; font-size:11px; line-height:1.5}
+#hint dt{color:var(--gold); float:left; clear:left; margin-right:6px}
+#hint dd{margin:0; color:var(--body)}
+.note{grid-column:2; font-family:"Newsreader",serif; font-size:13.5px; font-style:italic; color:var(--note-ink); padding:1px 16px 7px 0; line-height:1.42}
+
+/* right side */
+.stage{display:grid; grid-template-rows:minmax(0,1fr) auto auto auto; gap:9px; min-height:0; min-width:0}
+.screenbox{
+  position:relative; background:#191923; border:1px solid var(--rule); border-radius:3px;
+  box-shadow:var(--shadow); overflow:hidden; min-height:0;
+}
+#screen{display:block; width:100%; height:100%; object-fit:contain; max-width:100%;
+  -webkit-user-drag:none; user-select:none; background:#191923; cursor:crosshair}
+.try{display:flex; gap:9px; padding:10px 13px; background:var(--sunk); border:1px solid var(--rule); border-radius:3px; font-size:15.5px}
+.try .tag{font-family:"Silkscreen",monospace; font-size:8px; letter-spacing:.09em; color:var(--gold); text-transform:uppercase; padding-top:5px; flex:0 0 auto}
+.strip{display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-family:"JetBrains Mono",monospace; font-size:11px; color:var(--muted)}
+.strip b{color:var(--ink); font-weight:500}
+kbd{font-family:"JetBrains Mono",monospace; font-size:10px; background:var(--sunk); border:1px solid var(--rule); border-bottom-width:2px; border-radius:3px; padding:1px 4px; color:var(--ink)}
+.navrow{display:flex; gap:8px; align-items:center}
+.navrow button{
+  font-family:"JetBrains Mono",monospace; font-size:11.5px; padding:8px 12px; border-radius:2px;
+  background:var(--surface); color:var(--body); border:1px solid var(--rule); cursor:pointer;
+}
+.navrow button:hover{border-color:var(--muted); color:var(--ink)}
+.navrow button[disabled]{opacity:.35; cursor:default}
+.navrow .grow{flex:1 1 auto}
+.warn{
+  padding:8px 11px; border-left:3px solid var(--lie); background:var(--sunk);
+  font-family:"JetBrains Mono",monospace; font-size:11px; color:var(--lie);
+}
+.warn[hidden]{display:none}
+
+/* ---------- reference panels ---------- */
+dialog{
+  border:1px solid var(--rule); border-radius:4px; background:var(--surface); color:var(--body);
+  box-shadow:var(--shadow); padding:0; max-width:min(760px,92vw); max-height:82vh; width:100%;
+}
+dialog::backdrop{background:rgba(10,8,14,.55)}
+.dlg-head{display:flex; justify-content:space-between; align-items:center; gap:16px; padding:14px 18px; border-bottom:1px solid var(--rule)}
+.dlg-head h2{font-family:"Silkscreen",monospace; font-size:13px; color:var(--ink); margin:0}
+.dlg-head button{background:transparent; border:1px solid var(--rule); border-radius:2px; color:var(--muted); font-family:"JetBrains Mono",monospace; font-size:11px; padding:5px 9px; cursor:pointer}
+.dlg-body{padding:16px 18px 22px; overflow:auto; max-height:calc(82vh - 52px)}
+.dlg-body h3{font-family:"Silkscreen",monospace; font-size:11px; color:var(--gold); margin:20px 0 8px; letter-spacing:.04em}
+.dlg-body h3:first-child{margin-top:0}
+.dlg-body p{margin:0 0 10px; font-size:16px}
+pre.sh{background:var(--code-bg); color:var(--code-ink); font-family:"JetBrains Mono",monospace; font-size:12px; padding:11px 13px; border-radius:3px; overflow-x:auto; line-height:1.75; margin:0 0 12px}
+pre.sh .c{color:var(--code-dim)}
+table.alphabet{width:100%; border-collapse:collapse; font-size:15px}
+.alphabet td{padding:4px 10px 4px 0; vertical-align:top; border-bottom:1px solid var(--rule)}
+.alphabet td:first-child{font-family:"JetBrains Mono",monospace; font-weight:700; color:var(--gold); width:2.6em; text-align:center}
+.alphabet tr.lie td:first-child{color:var(--lie)}
+dl.words{margin:0}
+.words dt{font-family:"JetBrains Mono",monospace; font-size:12px; color:var(--ink); margin-top:11px}
+.words dd{margin:2px 0 0; font-size:15.5px}
+
+/* Narrow: one column cannot hold a 3:2 game AND readable code on one screen, so
+   here the page scrolls -- with the game pinned at the top while you read. */
+@media (max-width:1080px){
+  html,body{overflow:auto; height:auto}
+  /* every row content-sized, so the page grows and scrolls instead of clipping */
+  .app{height:auto; min-height:100dvh; overflow:visible; grid-template-rows:auto auto}
+  /* block flow, not grid: a sticky grid item can only stick inside its own row,
+     which is exactly its own height -- so it would never actually pin */
+  .split{display:block; padding:10px 12px; overflow:visible}
+  .pane{grid-template-rows:auto auto auto auto; margin-top:10px}
+  .code{min-height:52vh}
+  .stage{position:sticky; top:0; z-index:5; background:var(--bg);
+         padding-bottom:8px; grid-template-rows:auto auto auto auto}
+  .screenbox{height:min(38vh, calc((100vw - 24px) * 0.667))}
+  .pane{min-height:0}
+  .why{max-height:none}
+  .code{max-height:none; overflow-y:visible; overflow-x:auto}
+  .bar{flex-wrap:wrap; row-gap:7px}   /* the game pins instead; the bar may scroll away */
+  .rail{order:3; flex-basis:100%}
+}
+/* Short windows in the two-column layout: the prose gives up height first */
+@media (min-width:1081px) and (max-height:640px){
+  .why{max-height:26vh}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="bar">
+    <div class="brand">TRUST NO ONE<span>ONE LINE AT A TIME</span></div>
+    <div class="rail" id="rail"></div>
+    <div class="helpbtns">
+      <button type="button" id="b-run">running it</button>
+      <button type="button" id="b-alpha">the alphabet</button>
+      <button type="button" id="b-words">words</button>
+    </div>
+  </div>
+
+  <div class="split">
+    <section class="pane">
+      <div class="pane-head">
+        <span class="stepno" id="stepno">STEP 01 / 15</span>
+        <h1 id="title">&hellip;</h1>
+      </div>
+      <p class="why" id="why">&hellip;</p>
+      <div class="legend">
+        <span><span class="swatch add"></span>added here</span>
+        <span><span class="swatch del"></span>removed here</span>
+        <span><span class="swatch com"></span>comment</span>
+        <span id="filehint"></span>
+        <span class="rw" id="rewrites"></span>
+      </div>
+      <div class="code" id="code"></div>
+    </section>
+
+    <section class="stage">
+      <div class="screenbox">
+        <img id="screen" alt="The game, running">
+      </div>
+      <div class="try"><span class="tag">Try it</span><span id="try">&hellip;</span></div>
+      <div class="strip">
+        <span id="keyhint"></span>
+        <span>&middot;</span>
+        <span>run it yourself: <b id="runcmd">python3 steps/step01.py</b></span>
+      </div>
+      <div class="navrow">
+        <button id="prev" type="button">&larr; previous</button>
+        <button id="restart" type="button">restart this step</button>
+        <span class="grow"></span>
+        <button id="next" type="button">next step &rarr;</button>
+      </div>
+      <div class="warn" id="warn" role="status" aria-live="polite" hidden></div>
+    </section>
+  </div>
+</div>
+
+<div id="hint" role="tooltip"></div>
+
+<dialog id="dlg">
+  <div class="dlg-head"><h2 id="dlg-title">&hellip;</h2><button type="button" id="dlg-close">close</button></div>
+  <div class="dlg-body" id="dlg-body"></div>
+</dialog>
+
+<template id="t-run">
+  <h3>Getting it running</h3>
+  <p>You need Python 3 and one library, pygame. Everything below is typed into the same
+     black window you started the lesson from, in the folder <code id="folder">.</code></p>
+  <pre class="sh" id="cmds"></pre>
+  <p><b>On Windows</b>, the quickest way to start the lesson is to double-click
+     <code>run-lesson.bat</code> in that folder. It opens a window, starts the game and
+     opens this page. Close the window, or press <b>Ctrl+C</b> in it, to stop.</p>
+  <p>Every step is a real program in <code>steps</code>. Open one in a text editor
+     (IDLE, Notepad, VS Code, anything), change a number, run it again &mdash; that is the whole
+     loop of making a game.</p>
+  <h3>What you are building</h3>
+  <p>A platformer where the level lies to you. You run right toward a green exit, collecting
+     coins. A wizard curses you, and from then on some bricks are holograms, some spikes are
+     trampolines, some coins kill. A pebble, thrown, tells you what any tile really is.
+     Five levels, each built on a different lie.</p>
+  <h3>Sharing it</h3>
+  <p>Zip this folder and send it. Whoever opens it needs Python and pygame, then runs
+     <code id="runlast">py steps\step37.py</code>. That file is the finished game.</p>
+</template>
+
+<template id="t-alpha">
+  <h3>The alphabet</h3>
+  <p>Every square of the world is one letter, and a space is empty air. These are all of them.</p>
+  <table class="alphabet"><tbody>
+    <tr><td>P</td><td>where you start. Erased as soon as the level loads</td></tr>
+    <tr><td>#</td><td>brick. Solid, always</td></tr>
+    <tr><td>o</td><td>coin. Harmless, counts on the bar at the top</td></tr>
+    <tr><td>^</td><td>spike. Kills you, honestly</td></tr>
+    <tr><td>W</td><td>the wizard. Touch him once and you are cursed</td></tr>
+    <tr><td>G</td><td>the way out, to the next level</td></tr>
+    <tr class="lie"><td>%</td><td>hologram brick &mdash; solid until you are cursed, then nothing</td></tr>
+    <tr class="lie"><td>t</td><td>drawn as spikes; a trampoline once you can see it</td></tr>
+    <tr class="lie"><td>x</td><td>drawn as a coin; kills you once you are cursed</td></tr>
+    <tr class="lie"><td>~</td><td>floor that is never drawn, but holds you up</td></tr>
+    <tr class="lie"><td>c</td><td>brick that breaks after 26 frames of standing on it</td></tr>
+    <tr class="lie"><td>!</td><td>an exit that throws you back to the start</td></tr>
+    <tr class="lie"><td>?</td><td>rolled per run: spike or trampoline</td></tr>
+    <tr class="lie"><td>&amp;</td><td>rolled per run: brick or hologram</td></tr>
+  </tbody></table>
+  <p style="margin-top:14px">The letters in red are the liars. They arrive one step at a time: <code>%</code> at step 9, the next four at step 11, the two rolled ones at step 12.</p>
+</template>
+
+<template id="t-words">
+  <h3>Words used here</h3>
+  <dl class="words">
+    <dt>frame</dt><dd>one trip round the game loop. This game runs 60 a second, and every speed in it is "per frame".</dd>
+    <dt>dictionary</dt><dd>a labelled bag of values. <code>P = {"x": 64.0}</code> stores it, <code>P["x"]</code> reads it back.</dd>
+    <dt>set</dt><dd>a bag with no duplicates and no order. <code>set("%tx")</code> makes a set of three separate letters; <code>x in s</code> asks whether something is in it.</dd>
+    <dt>tuple</dt><dd>a few values in fixed order, in brackets: <code>(255, 0, 0)</code> is a colour, <code>(c, r)</code> is a square of the grid.</dd>
+    <dt>Rect</dt><dd>pygame's rectangle: left, top, width, height. It reports its own <code>.right</code>, <code>.bottom</code>, <code>.center</code>, which is what makes pushing out of a wall two lines instead of ten.</dd>
+    <dt>surface</dt><dd>anything you can draw on. <code>scr</code> is the screen's surface; text rendered by a font is a small surface too.</dd>
+    <dt>blit</dt><dd>paste one surface onto another: <code>scr.blit(picture, (x, y))</code>.</dd>
+    <dt>HUD</dt><dd>the bar of text across the top of a game: level, time, coins.</dd>
+    <dt>yield</dt><dd>hand a value back and pause there. A function that yields can be looped over, producing values one at a time instead of building a whole list.</dd>
+    <dt>[x for y in z]</dt><dd>a list built by a loop, in one line. <code>[r.ljust(9) for r in rows]</code> means "every row, padded".</dd>
+    <dt>next(...)</dt><dd>run a loop like that and stop at the first answer. Used to find the P.</dd>
+    <dt>//</dt><dd>division that throws away the remainder. <code>100 // 32</code> is 3 &mdash; pixel 100 is in column 3.</dd>
+    <dt>** 0.5</dt><dd>square root. <code>(dx*dx + dy*dy) ** 0.5</code> is the distance between two points.</dd>
+    <dt>%</dt><dd>two unrelated jobs. In <code>"coins %d" % n</code> it drops a number into text. As a tile letter it means a hologram brick.</dd>
+    <dt>seed</dt><dd>the number the dice start from. Same seed, same "random" level, every time &mdash; which is how you re-open a bug.</dd>
+    <dt>assert</dt><dd>a line that does nothing when it is right and stops the program when it is wrong. The whole of step 15 is asserts.</dd>
+    <dt>global</dt><dd>inside a function, says "change the one outside, do not make a new one in here".</dd>
+    <dt>clamp</dt><dd>keep a number inside a range, with a max and a min. The camera is one clamp.</dd>
+    <dt>async / await</dt><dd>marks a function that is allowed to pause. The one <code>await</code> in each loop is what lets this page take a frame; run the file yourself and it does nothing.</dd>
+    <dt>ponytail:</dt><dd>not Python. A tag this game's author writes on a comment to mean "this is deliberately the simple version".</dd>
+  </dl>
+</template>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const rail = $("rail"), codeEl = $("code"), screen = $("screen"), warn = $("warn");
+let idx = 1, KEYMAP = {}, lastFrames = -1, folder = "", LASTSTEP = 37, TITLES = [];
+let CMD = {py: "python3", sep: "/", windows: false};
+
+/* ---- input, defined first so a step change can release keys ---- */
+const held = new Set();
+function post(path, body){
+  return fetch(path, {method:"POST", headers:{"Content-Type":"application/json"},
+                      body: JSON.stringify(body), keepalive:true}).catch(()=>{});
+}
+function syncHeld(){ post("/api/input", {t:"held", keys:[...held]}); }
+function releaseAll(){ held.clear(); syncHeld(); }
+
+/* ---- the code panel: the real file, diffed against the step before ---- */
+async function show(n, restart){
+  idx = Math.max(1, Math.min(LASTSTEP, n));
+  let s;
+  try{
+    s = await (await fetch("/api/step?n=" + idx)).json();
+  }catch(e){
+    return showWarn("cannot reach the lesson. Is the lesson still running in its window?");
+  }
+  folder = s.folder || "";
+  STEP_SYMBOLS = s.symbols || {};
+
+  LASTSTEP = s.last || LASTSTEP;
+  $("stepno").textContent = "STEP " + String(idx).padStart(2, "0") + " / " + LASTSTEP;
+  $("title").textContent = s.title;
+  $("why").innerHTML = s.why;
+  $("try").innerHTML = s.trial;
+  CMD = {py: s.py || "python3", sep: s.sep || "/", windows: !!s.windows};
+  $("runcmd").textContent = CMD.py + " " + s.file;
+  $("filehint").textContent = s.file + " - " + s.code_lines + " lines, +" + s.added +
+                             (s.removed ? " -" + s.removed : "");
+  $("rewrites").textContent = s.rewritten.length
+      ? "rewrites " + s.rewritten.map(f => f + "()").join(", ")
+      : "";
+
+  const c = s.controls || {};
+  // a control only appears once the step's own code can answer it
+  const keys = [];
+  if (c.move)    keys.push(kb("&larr; &rarr;") + " walk");
+  if (c.jump)    keys.push(kb("Space") + " jump");
+  if (c.click)   keys.push(kb("click") + " pebble");
+  if (c.restart) keys.push(kb("R") + " restart");
+  $("keyhint").innerHTML = keys.length ? keys.join(" &middot; ")
+                                       : "nothing to press yet";
+
+  [...rail.children].forEach((chip, j) => {
+    chip.setAttribute("aria-pressed", j + 1 === idx ? "true" : "false");
+    if (j + 1 === idx) chip.scrollIntoView({block:"nearest", inline:"center"});
+  });
+
+  codeEl.replaceChildren();
+  const frag = document.createDocumentFragment();
+  for (const ln of s.lines){
+    const row = document.createElement("div");
+    row.className = "ln " + ln.kind;
+    const num = document.createElement("span"); num.className = "num"; num.textContent = ln.n;
+    if (ln.kind === "same" && ln.from && ln.from !== idx) num.dataset.step = ln.from;
+    const src = document.createElement("span"); src.className = "src";
+    const marks = (ln.ids || []).slice().sort((a, b) => a.a - b.a);
+    if (marks.length){
+      let at = 0;
+      for (const m of marks){
+        if (m.a < at) continue;                       // never overlap two marks
+        if (m.a > at) src.appendChild(document.createTextNode(ln.text.slice(at, m.a)));
+        const tok = document.createElement("span");
+        tok.className = "t-" + m.t + (m.sym ? " id" : "");
+        if (m.sym) tok.dataset.sym = m.sym;
+        tok.textContent = ln.text.slice(m.a, m.b);
+        src.appendChild(tok);
+        at = m.b;
+      }
+      src.appendChild(document.createTextNode(ln.text.slice(at) || ""));
+    } else {
+      src.textContent = ln.text || " ";
+    }
+    row.append(num, src); frag.appendChild(row);
+  }
+  codeEl.appendChild(frag);
+  const first = codeEl.querySelector(".add, .del");
+  codeEl.scrollTop = (idx > 1 && first) ? Math.max(0, first.offsetTop - codeEl.offsetTop - 30) : 0;
+
+  $("prev").disabled = (idx === 1);
+  $("next").disabled = (idx === LASTSTEP);
+
+  releaseAll();                       // the new step starts with nothing held
+  await post("/api/select", {n: idx, restart: !!restart});
+  lastFrames = -1;
+}
+function kb(label){ return "<kbd>" + label + "</kbd>"; }
+
+/* ---- hover a name, see what it means ---- */
+let SYMBOLS = {}, STEP_SYMBOLS = {};
+const hint = $("hint");
+function showHint(el){
+  const sym = STEP_SYMBOLS[el.dataset.sym] || SYMBOLS[el.dataset.sym];
+  if (!sym) return;
+  const name = sym.name || el.dataset.sym;
+  let html = '<div class="h">' + name +
+             (sym.expand && sym.expand !== name ? ' <em>&mdash; ' + sym.expand + "</em>" : "") +
+             '<span class="k">' + ({func:"function", const:"constant", lib:"library", var:"variable", param:"parameter"}[sym.kind] || sym.kind) + "</span></div>";
+  if (sym.kind === "func"){
+    html += "<dl>";
+    if (sym.sig) html += "<dt>call</dt><dd>" + esc(sym.sig) + "</dd>";
+    if (sym.takes) html += "<dt>takes</dt><dd>" + esc(sym.takes) + "</dd>";
+    if (sym.ret) html += "<dt>gives</dt><dd>" + esc(sym.ret) + "</dd>";
+    html += "</dl>";
+  }
+  if (sym.text) html += "<p>" + esc(sym.text) + "</p>";
+  hint.innerHTML = html;
+  hint.dataset.show = "1";
+  const r = el.getBoundingClientRect(), h = hint.getBoundingClientRect();
+  let x = r.left, y = r.bottom + 8;
+  if (x + h.width > innerWidth - 12) x = innerWidth - h.width - 12;
+  if (y + h.height > innerHeight - 12) y = r.top - h.height - 8;
+  hint.style.left = Math.max(12, x) + "px";
+  hint.style.top = Math.max(12, y) + "px";
+}
+function esc(t){ const d = document.createElement("div"); d.textContent = t; return d.innerHTML; }
+function hideHint(){ hint.dataset.show = "0"; }
+codeEl.addEventListener("mouseover", (e) => {
+  const num = e.target.closest(".num[data-step]");
+  if (num) return showFromHint(num);
+  const el = e.target.closest(".id");
+  if (el) showHint(el); else hideHint();
+});
+codeEl.addEventListener("click", (e) => {
+  const num = e.target.closest(".num[data-step]");
+  if (num){ hideHint(); show(Number(num.dataset.step)); }
+});
+function showFromHint(el){
+  const n = Number(el.dataset.step);
+  hint.innerHTML = '<div class="h">line written at step ' + n +
+                   '<span class="k">go there</span></div><p>' +
+                   esc(TITLES[n - 1] || "") + '<br><span style="opacity:.7">click the number to jump back to it</span></p>';
+  hint.dataset.show = "1";
+  const r = el.getBoundingClientRect(), h = hint.getBoundingClientRect();
+  hint.style.left = Math.max(12, Math.min(r.left, innerWidth - h.width - 12)) + "px";
+  hint.style.top = Math.max(12, Math.min(r.bottom + 8, innerHeight - h.height - 12)) + "px";
+}
+codeEl.addEventListener("mouseleave", hideHint);
+codeEl.addEventListener("scroll", hideHint, {passive:true});
+
+/* ---- is the game actually alive? ---- */
+function showWarn(text){ warn.hidden = false; warn.textContent = text; }
+let BUILD = null;
+async function poll(){
+  try{
+    const s = await (await fetch("/api/state")).json();
+    if (BUILD === null) BUILD = s.build;
+    else if (s.build !== BUILD) return location.reload();   // the lesson was rebuilt
+    if (s.error && s.stuck) showWarn(s.error + " -- fix the file and press restart.");
+    else if (s.error) showWarn(s.error);
+    else if (lastFrames === s.frames) showWarn("the game has stopped drawing. Press restart.");
+    else warn.hidden = true;
+    lastFrames = s.frames;
+  }catch(e){
+    showWarn("lost the lesson server. Is the lesson still running in its window?");
+  }
+}
+setInterval(poll, 2500);
+
+/* ---- every keystroke goes to the game, wherever the page is focused ---- */
+function codeOf(e){ return KEYMAP[e.code]; }
+document.addEventListener("keydown", (e) => {
+  if ($("dlg").open) return;              // except while a reference panel is open
+  const c = codeOf(e);
+  if (c === undefined) return;
+  e.preventDefault();
+  if (held.has(c)) return;
+  held.add(c); post("/api/input", {t:"kd", k:c});
+});
+document.addEventListener("keyup", (e) => {
+  const c = codeOf(e);
+  if (c === undefined || !held.has(c)) return;
+  held.delete(c); post("/api/input", {t:"ku", k:c});
+});
+screen.setAttribute("draggable", "false");
+screen.addEventListener("dragstart", (e) => e.preventDefault());   // no ghost image on drag
+screen.addEventListener("pointerdown", (e) => {
+  const r = screen.getBoundingClientRect();
+  const scale = Math.min(r.width / 960, r.height / 640);      // the picture is letterboxed
+  const ox = (r.width - 960 * scale) / 2, oy = (r.height - 640 * scale) / 2;
+  const x = (e.clientX - r.left - ox) / scale, y = (e.clientY - r.top - oy) / scale;
+  if (x >= 0 && x < 960 && y >= 0 && y < 640) post("/api/input", {t:"click", x:Math.round(x), y:Math.round(y)});
+});
+window.addEventListener("pagehide", releaseAll);              // a reload must not leave a key down
+document.addEventListener("visibilitychange", () => { if (document.hidden) releaseAll(); });
+window.addEventListener("blur", releaseAll);
+
+/* ---- navigation ---- */
+$("prev").addEventListener("click", () => show(idx - 1));
+$("next").addEventListener("click", () => show(idx + 1));
+$("restart").addEventListener("click", () => show(idx, true));
+
+/* ---- the reference panels ---- */
+const dlg = $("dlg");
+function openPanel(which, title){
+  $("dlg-title").textContent = title;
+  $("dlg-body").replaceChildren($(which).content.cloneNode(true));
+  const f = $("dlg-body").querySelector("#folder");
+  if (f && folder) f.textContent = folder;
+  const box = $("dlg-body").querySelector("#cmds");
+  if (box){
+    const s = CMD.sep, py = CMD.py;
+    box.innerHTML =
+      '<span class="c"># once, if pygame is missing:</span>\n' +
+      py + " -m pip install pygame\n\n" +
+      '<span class="c"># start this lesson:</span>\n' +
+      py + " main.py\n\n" +
+      '<span class="c"># run one step in its own window:</span>\n' +
+      py + " steps" + s + "step07.py\n\n" +
+      '<span class="c"># let the game test itself, with no window at all:</span>\n' +
+      py + " steps" + s + "step37.py --test";
+  }
+  const last = $("dlg-body").querySelector("#runlast");
+  if (last) last.textContent = CMD.py + " steps" + CMD.sep + "step37.py";
+  dlg.showModal();
+}
+$("b-run").addEventListener("click", () => openPanel("t-run", "Running it"));
+$("b-alpha").addEventListener("click", () => openPanel("t-alpha", "The alphabet"));
+$("b-words").addEventListener("click", () => openPanel("t-words", "Words used here"));
+$("dlg-close").addEventListener("click", () => dlg.close());
+dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
+
+/* ---- start ---- */
+(async function start(){
+  try{
+    KEYMAP = await (await fetch("/api/keys")).json();
+    SYMBOLS = await (await fetch("/api/symbols")).json();
+    const steps = await (await fetch("/api/steps")).json();
+    TITLES = steps.map(s => s.title);
+    for (const s of steps){
+      const b = document.createElement("button");
+      b.className = "chip"; b.type = "button"; b.setAttribute("aria-pressed", "false");
+      b.textContent = String(s.n).padStart(2, "0") + "  " + s.title;
+      b.addEventListener("click", () => show(s.n));
+      rail.appendChild(b);
+    }
+    screen.src = "/stream.mjpg";
+    screen.addEventListener("error", () => showWarn("the picture stopped arriving. Reload the page."));
+    await show(1);
+    poll();
+  }catch(e){
+    showWarn("could not start: " + e.message);
+  }
+})();
+</script>
+</body>
+</html>

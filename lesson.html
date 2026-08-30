@@ -301,7 +301,7 @@ dl.words{margin:0}
      Five levels, each built on a different lie.</p>
   <h3>Sharing it</h3>
   <p>Zip this folder and send it. Whoever opens it needs Python and pygame, then runs
-     <code id="runlast">py steps\step37.py</code>. That file is the finished game.</p>
+     <code id="runlast">py steps\step57.py</code>. That file is the finished game.</p>
 </template>
 
 <template id="t-alpha">
@@ -569,11 +569,11 @@ function openPanel(which, title){
       py + " main.py\n\n" +
       '<span class="c"># run one step in its own window:</span>\n' +
       py + " steps" + s + "step07.py\n\n" +
-      '<span class="c"># let the game test itself, with no window at all:</span>\n' +
-      py + " steps" + s + "step37.py --test";
+      py + " steps" + s + "step" + String(LASTSTEP).padStart(2, "0") + ".py";
   }
   const last = $("dlg-body").querySelector("#runlast");
-  if (last) last.textContent = CMD.py + " steps" + CMD.sep + "step37.py";
+  if (last) last.textContent = CMD.py + " steps" + CMD.sep + "step" +
+    String(LASTSTEP).padStart(2, "0") + ".py";
   dlg.showModal();
 }
 $("b-run").addEventListener("click", () => openPanel("t-run", "Running it"));

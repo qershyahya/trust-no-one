@@ -1,13 +1,10 @@
 """Trust No One -- step 1: A window that stays open.   Run it:  python3 steps/step01.py"""
 
-# sys is Python's own settings; this game uses it once, in step 37, to read what you typed after
-# the filename
-import sys
 # the game library itself
 import pygame
 
 # the window, in pixels
-VW, VH = 960, 640
+VW, VH = 960, 640                     # the window, in pixels
 
 # the whole game lives in here: set up once, then loop forever
 def main():

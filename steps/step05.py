@@ -1,14 +1,15 @@
 """Trust No One -- step 5: The world is text.   Run it:  python3 steps/step05.py"""
 
-import sys   # sys is Python's own settings; this game uses
 import pygame   # the game library itself
 
-# TILE is the size of one square, in pixels. 960 / 32 = 30 squares across the window
-TILE, VW, VH = 32, 960, 640
+VW, VH = 960, 640                     # the window, in pixels
+# one square of the world is 32 pixels; column 5 starts at pixel 160
+TILE = 32                             # one square of the world
 
-SPD = 3.6                             # top walking speed, pixels per frame
-GRAV, MAXFALL = 0.35, 12              # pull per frame, and the fastest you may fall
 PW, PH = 20, 28                       # how big you are
+SPD = 3.6                             # top walking speed, pixels per frame
+GRAV = 0.35                           # pull per frame
+MAXFALL = 12                          # the fastest you may fall
 
 # every tile is one letter: '#' brick  'G' exit  'P' spawn
 # a name for an empty row, so the thirteen rows of sky above the level do not fill the screen
@@ -26,21 +27,39 @@ L1 = [
     "############################################################",
     "############################################################",
 ]
+# the levels, in order. One so far; a function that takes a level number is ready for five
+LEVELS = [L1]                          # the levels, in order: one so far
 
+# LVL is the level as a list of strings; COLS and ROWS are its size, worked out by load()
 LVL, COLS, ROWS = [], 0, 0                            # the level, once it is measured
-P = {"x": 64.0, "y": 288.0, "vx": 0.0, "vy": 0.0}     # where you are, and how fast
+# which level is loaded: 0 is the first
+level = 0                                             # which level is loaded
+SPAWN = (64, 288)                                     # where you start
+P = {}                                                # where you are, and how fast
 
-# get the level ready to play
-def load():
-    """Pad every row to the same width, so LVL[r][c] never runs off the end."""
-    # change the variables outside this function instead of making new ones inside it
-    global LVL, COLS, ROWS
-    # the widest row sets the width of the world
-    COLS = max(len(r) for r in L1)
-    # pad every row to that width, so LVL[r][c] never runs off the end
-    LVL = [r.ljust(COLS) for r in L1]
+# load takes a number now: which level to start
+def load(i):
+    """Take level i, measure it, find where you start, and stand there."""
+    global LVL, COLS, ROWS, level
+    level = i
+    # the level asked for, as its list of strings
+    rows = LEVELS[i]
+    COLS = max(len(r) for r in rows)
+    # pad every row to the same width, so LVL[r][c] never runs off the end
+    LVL = [r.ljust(COLS) for r in rows]
     # and the number of rows is the height
     ROWS = len(LVL)
+    # back to the start
+    place()
+
+def reset():   # a whole fresh run
+    """A whole fresh run: everything back to the beginning."""
+    # the first level
+    load(0)
+
+def place():   # stand at the start of the level
+    """At the start of the level, standing still."""
+    P.update(x=float(SPAWN[0]), y=float(SPAWN[1]), vx=0.0, vy=0.0)   # start where the level
 
 # what letter is at column c, row r?
 def tile(c, r):
@@ -60,8 +79,7 @@ def main():   # the whole game lives in here
     scr = pygame.display.set_mode((VW, VH))   # make the window
     pygame.display.set_caption("Trust No One")   # the title on the window bar
     clk = pygame.time.Clock()   # our metronome
-    # build the level before the loop starts
-    load()
+    reset()   # a whole fresh run
     while True:   # the game loop
         for e in pygame.event.get():   # everything that happened since the last frame
             if e.type == pygame.QUIT:   # the X button on the window

@@ -1,15 +1,20 @@
 """Trust No One -- step 23: The brick that is not there.   Run it:  python3 steps/step23.py"""
 
-import sys   # sys is Python's own settings; this game uses
 import pygame   # the game library itself
 
-TILE, VW, VH = 32, 960, 640   # TILE is the size of one square, in pixels
+VW, VH = 960, 640                     # the window, in pixels
+TILE = 32                             # one square of the world
 
-# feel knobs, tuned at 60fps
-GRAV, SPD, JUMP, MAXFALL = 0.35, 3.6, -9.2, 12   # JUMP is negative because y grows downward
-ACC, AIR, FRIC = 0.55, 0.32, 0.72   # how fast you gain speed on the ground
-COYOTE, BUFFER, CUT = 7, 8, 0.42     # late jump, early jump, tap = short hop
-PW, PH = 20, 28
+PW, PH = 20, 28                       # how big you are
+SPD = 3.6                             # top walking speed, pixels per frame
+GRAV = 0.35                           # pull per frame
+MAXFALL = 12                          # the fastest you may fall
+JUMP = -9.2                           # the kick upward, pixels per frame
+COYOTE = 7                            # you may still jump 7 frames after the edge
+BUFFER = 8                            # a press up to 8 frames early still counts
+CUT = 0.42                            # let go early and the jump is cut to this
+ACC, AIR, FRIC = 0.55, 0.32, 0.72     # how fast you gain speed, on the ground and off it, and lose it
+LIVES = 5                             # how many you start with
 
 # honest: '#' brick  'o' coin  '^' spike  'W' wizard  'G' exit  'P' spawn
 # lies:   '%' hologram brick
@@ -19,49 +24,76 @@ L1 = [   # the level
     "                                            o  o            ",
     ROW,
     "                      ####               ######             ",
-    "                                      o             o       ",
-    " P             W                  ^                      G  ",
-    "##########%%%#######    ####################################",
-    "##########   #######    ####################################",
+    "        #                             o             o       ",
+    " P      #      W                  ^                      G  ",
+    "####  ####%%%#######    ####################################",
+    "####  ####   #######    ####################################",
 ]
+LEVELS = [L1]                          # the levels, in order: one so far
 
-# every letter that is not what it looks like. One, so far
-LIARS = set("%")
+# every letter that lies, including the five you have not met yet
+LIARS = set("%tx~c!")                 # every letter that lies, including the ones you have not met yet
 
-LVL, COLS, ROWS, SPAWN = [], 0, 0, (0, 0)
-P = {}
-cursed = wizard = False   # two flags
-coins = coy = buf = 0
+LVL, COLS, ROWS = [], 0, 0                            # the level, once it is measured
+level = 0                                             # which level is loaded
+SPAWN = (0, 0)                                        # where you start, found by load()
+P = {}                                                # where you are, and how fast
+cursed = False   # the curse: not yet
+wizard = True   # he is standing in the level until you touch
+coins = 0   # how many you have taken
+coy = 0   # coyote frames left
+buf = 0   # frames since the jump key went down
+lives = LIVES   # how many you have left, right now
+over = False                                          # the run is finished
 taken = set()   # which coins you already picked up
 
-def load():   # get the level ready to play
-    """Measure the level, find the P, then erase it so it is never drawn."""
-    global LVL, COLS, ROWS, SPAWN   # change the variables outside this function
-    COLS = max(len(r) for r in L1)   # the widest row sets the width of the world
-    LVL = [r.ljust(COLS) for r in L1]   # pad every row to that width
+def load(i):   # load takes a number now: which level to start
+    """Take level i, measure it, find where you start, and stand there."""
+    global LVL, COLS, ROWS, level, SPAWN
+    level = i
+    rows = LEVELS[i]   # the level asked for, as its list of strings
+    COLS = max(len(r) for r in rows)
+    LVL = [r.ljust(COLS) for r in rows]   # pad every row to the same width
     ROWS = len(LVL)   # and the number of rows is the height
     SPAWN = next((c * TILE, r * TILE) for r in range(ROWS) for c in range(COLS) if LVL[r][c] == "P")
     LVL = [r.replace("P", " ") for r in LVL]   # then erase it
-    taken.clear()
-    die()   # back to the start
+    taken.clear()   # a fresh level has all its coins
+    place()   # back to the start
 
 def reset():   # a whole fresh run
-    global cursed, wizard, coins
-    cursed, coins = False, 0
-    wizard = True
-    load()   # build the level before the loop starts
+    """A whole fresh run: everything back to the beginning."""
+    global cursed, wizard, lives, over, coins
+    cursed = False   # the curse: not yet
+    wizard = True   # he is standing in the level until you touch
+    coins = 0   # how many you have taken
+    lives = LIVES   # how many you have left, right now
+    over = False   # true when the last heart has gone
+    load(0)   # the first level
+
+def place():   # stand at the start of the level
+    """At the start of the level, standing still."""
+    P.update(x=float(SPAWN[0]), y=float(SPAWN[1]), vx=0.0, vy=0.0)   # start where the level
+    P["g"] = False   # not on the ground, until step() says so
+    P["jump"] = False   # not mid-jump
+
 
 def die():   # back to the start, standing still
-    """Back to the start, standing still."""
-    P.update(x=float(SPAWN[0]), y=float(SPAWN[1]), vx=0.0, vy=0.0, g=False, jump=False)
+    """Being killed. It costs a life, and the last one ends the run."""
+    global lives, over
+    lives -= 1   # one heart, spent
+    if lives <= 0:   # that was the last one
+        over = True   # nothing moves again until you ask for a new
+        return place()   # put the body down and stop
+    place()   # back to the start
 
 def tile(c, r):   # what letter is at column c, row r?
     """What letter is at column c, row r? Off the map counts as empty air."""
     return LVL[r][c] if 0 <= r < ROWS and 0 <= c < COLS else " "   # off the edge of the map
 
 def solid(ch):   # which letters stop you
-    # a hologram is solid only while you still believe in it
-    return ch == "#" or (ch == "%" and not cursed)
+    """Which letters stop you. Floor you cannot see and bricks that crumble are floor;
+    a hologram is floor only until you are cursed."""
+    return ch in "#~c" or (ch == "%" and not cursed)
 
 def prect():   # your box, right now, as a Rect
     """Your box, right now."""
@@ -71,12 +103,13 @@ def cells(rect):   # every tile a box overlaps
     """Every tile this box overlaps -- usually two to six of them."""
     for r in range(rect.top // TILE, (rect.bottom - 1) // TILE + 1):   # the -1 means touching
         for c in range(rect.left // TILE, (rect.right - 1) // TILE + 1):
-            ch = tile(c, r)
+            ch = tile(c, r)   # what is written in the square it has reached
             if ch != " ":
                 yield c, r, ch   # hand them back one at a time as the loop asks
 
 def step(left, right, pressed=False, held=False):   # two new arguments
     global cursed, wizard, coins, coy, buf
+    if over: return                               # the run is finished
 
     want = (right - left) * SPD   # the speed you asked for
     a = ACC if P["g"] else AIR   # 0.55 of steering on the ground
@@ -91,7 +124,7 @@ def step(left, right, pressed=False, held=False):   # two new arguments
     if P["jump"] and not held and P["vy"] < JUMP * CUT:   # let go early while still rising
         P["vy"], P["jump"] = JUMP * CUT, False    # let go early, hop short
     if P["vy"] >= 0:   # once you are falling there is nothing left
-        P["jump"] = False
+        P["jump"] = False   # not mid-jump
     P["vy"] = min(P["vy"] + GRAV, MAXFALL)   # add gravity every frame
 
     P["x"] += P["vx"]
@@ -101,6 +134,7 @@ def step(left, right, pressed=False, held=False):   # two new arguments
             if P["vx"] > 0: r.right = c * TILE   # moving right
             elif P["vx"] < 0: r.left = (c + 1) * TILE   # moving left: the other face
             P["x"] = float(r.x); P["vx"] = 0.0   # stop dead, or you keep pressing into it
+    P["x"] = min(max(P["x"], 0.0), COLS * TILE - PW)   # the level has two ends
 
     P["y"] += P["vy"]
     r = prect()   # where that move put you
@@ -117,55 +151,92 @@ def step(left, right, pressed=False, held=False):   # two new arguments
     for c, rw, ch in cells(prect()):   # every square you are standing in, this frame
         if ch == "^":   # a real spike, which never lied to anybody
             return die()   # back to the start, and nothing else this frame
-        elif ch == "o" and (c, rw) not in taken:
+        if ch == "o" and (c, rw) not in taken:   # a coin you have not had yet
             taken.add((c, rw)); coins += 1   # remember it
-        elif ch == "W" and wizard:   # touched the wizard
+        if ch == "W" and wizard:
             wizard, cursed = False, True   # he vanishes, and you are cursed
 
-LOOK = {"#": (150, 110, 70), "%": (150, 110, 70), "^": (170, 170, 180), "o": (240, 200, 60)}
+LOOK = {"#": (150, 110, 70), "%": (150, 110, 70), "c": (150, 110, 70),
+        "^": (170, 170, 180), "t": (170, 170, 180), "o": (240, 200, 60), "x": (240, 200, 60)}
 
-def draw(scr, font):   # draw needs the font now, for the coin counter
-    cam = max(0, min(int(P["x"]) + PW // 2 - VW // 2, COLS * TILE - VW))
+def heart(scr, x, y, full):   # a heart, drawn rather than loaded
+    """A small heart: two lobes and a point. Cheaper than a picture, and it never
+    goes missing."""
+    col = (222, 70, 90) if full else (70, 60, 66)
+    pygame.draw.circle(scr, col, (x + 4, y + 4), 4)
+    pygame.draw.circle(scr, col, (x + 11, y + 4), 4)
+    pygame.draw.polygon(scr, col, [(x, y + 5), (x + 15, y + 5), (x + 7, y + 15)])
+
+def draw(scr, font, big):   # two fonts now
+    here = P["x"]                                   # what the camera follows
+    cam = max(0, min(int(here) + PW // 2 - VW // 2, COLS * TILE - VW))   # the camera
     scr.fill((25, 25, 35))   # paint over the last frame, or it smears
     for r in range(ROWS):   # every row
         for c in range(cam // TILE, min(COLS, cam // TILE + VW // TILE + 2)):
             ch = LVL[r][c]
-            if ch == " " or (c, r) in taken or (ch == "W" and not wizard):
+            if ch == " ":   # air: nothing to draw
+                continue
+            if (c, r) in taken:   # a coin you took is not drawn
+                continue
+            if ch == "W" and not wizard:   # once he is gone, his square is air
                 continue
             box = pygame.Rect(c * TILE - cam, r * TILE, TILE, TILE)   # every drawn thing
-            if ch == "o":
-                pygame.draw.circle(scr, LOOK[ch], box.center, 9)   # coins are circles, radius 9
-            elif ch == "^":
-                pygame.draw.polygon(scr, LOOK[ch], [box.bottomleft, (box.centerx, box.top), box.bottomright])
-            elif ch == "W":
+            if ch in "ox":   # coins, honest and not
+                col = LOOK[ch]   # the colour this letter is drawn in
+                pygame.draw.circle(scr, col, box.center, 9)
+                continue
+            if ch in "^t":   # spikes, and the spikes that are not
+                col = LOOK[ch]   # the colour this letter is drawn in
+                pts = [box.bottomleft, (box.centerx, box.top), box.bottomright]
+                pygame.draw.polygon(scr, col, pts)
+                continue
+            if ch == "W":
                 pygame.draw.rect(scr, (160, 80, 220), box.inflate(-8, 0))   # the wizard
-            elif ch == "G":   # the way out
-                pygame.draw.rect(scr, (90, 230, 190), box.inflate(-6, -2))
-            else:
-                pygame.draw.rect(scr, LOOK[ch], box)   # fill it with the colour for that letter
+                continue
+            if ch in "G!":   # the way out, and the exit that lies
+                col = (90, 230, 190)   # exit green
+                pygame.draw.rect(scr, col, box.inflate(-6, -2))
+                continue
+            if ch in "#%~c":
+                col = LOOK[ch]   # the colour this letter is drawn in
+                pygame.draw.rect(scr, col, box)
                 pygame.draw.rect(scr, (0, 0, 0), box, 1)   # the last argument is a line width
-    pygame.draw.rect(scr, (240, 235, 220), (int(P["x"]) - cam, int(P["y"]), PW, PH), border_radius=4)
-    scr.blit(font.render("coins %d" % coins, True, (255, 255, 255)), (10, 10))
+                continue
+    x, y = int(P["x"]) - cam, int(P["y"])
+    pygame.draw.rect(scr, (240, 235, 220), (x, y, PW, PH), border_radius=4)
+    hud = "coins %d" % coins   # the words along the top: one number, for now
+    for i in range(LIVES):   # one heart per life you started with
+        heart(scr, VW - 30 - i * 22, 10, i < lives)   # the ones past lives are drawn dark
+    if over:   # the run is finished
+        veil = pygame.Surface((VW, VH), pygame.SRCALPHA)   # a surface with an alpha channel
+        veil.fill((8, 6, 12, 185))   # near-black, and 185 out of 255 opaque
+        scr.blit(veil, (0, 0))
+        card = big.render("GAME OVER", True, (240, 120, 130))   # the only red text in the game
+        scr.blit(card, card.get_rect(center=(VW // 2, VH // 2 - 20)))
+        again = font.render("press space to try again", True, (222, 216, 206))
+        scr.blit(again, again.get_rect(center=(VW // 2, VH // 2 + 24)))
+        return
+    scr.blit(font.render(hud, True, (255, 255, 255)), (10, 10))
 
 def main():   # the whole game lives in here
     pygame.init()   # wake the library up
     scr = pygame.display.set_mode((VW, VH))   # make the window
     pygame.display.set_caption("Trust No One")   # the title on the window bar
-    font = pygame.font.SysFont(None, 24)   # any font the system has, at size 24
+    font, big = pygame.font.SysFont(None, 24), pygame.font.SysFont(None, 30)   # two sizes
     clk = pygame.time.Clock()   # our metronome
-    reset()
+    reset()   # a whole fresh run
     while True:   # the game loop
         pressed = False   # true for one frame only
         for e in pygame.event.get():   # everything that happened since the last frame
             if e.type == pygame.QUIT:   # the X button on the window
                 return
             if e.type == pygame.KEYDOWN:
-                if e.key == pygame.K_r: reset()
+                if over and e.key == pygame.K_SPACE: reset()   # space on the game over screen
                 if e.key in (pygame.K_SPACE, pygame.K_UP, pygame.K_w): pressed = True
         k = pygame.key.get_pressed()   # which keys are held down right now
         step(k[pygame.K_LEFT] or k[pygame.K_a], k[pygame.K_RIGHT] or k[pygame.K_d], pressed,
              k[pygame.K_SPACE] or k[pygame.K_UP] or k[pygame.K_w])
-        draw(scr, font)
+        draw(scr, font, big)   # draw() takes both fonts from the day it takes
         pygame.display.flip()   # show the frame you just drew
         clk.tick(60)   # sleep so the loop runs 60 times a second
 

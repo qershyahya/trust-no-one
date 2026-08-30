@@ -1,2 +1,7 @@
 __pycache__/
 *.pyc
+
+# everything that is not the tutorial lives here, ignored: git commits the lesson only
+web/
+tools/
+submition/

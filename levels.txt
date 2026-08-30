@@ -1,0 +1,122 @@
+# The five levels, as text. Edit this file and the game plays what you wrote.
+# Level I has three coins at the start that the L1 strings in the code do not:
+# proof that from step 63 on, this file is the level and the code is only its first draft.
+#
+# A level is everything between the two bars. One character is one square:
+#   #  brick      o  coin       ^  spikes      G  the way out    P  where you start
+#   %  looks like a brick, is not      x  looks like a coin, kills you
+#   t  looks like spikes, bounces      ~  floor you cannot see
+#   c  a brick that gives way          !  looks like the way out, is not
+#   ?  rolled: spikes or trampoline    &  rolled: brick or hologram
+
+[I. The Curse]
+|                                                            |
+|                                                            |
+|                                                            |
+|                                                            |
+|                                                            |
+|                                                            |
+|                                                            |
+|                                                            |
+|                                                            |
+|                                                            |
+|                                                            |
+|                                                            |
+|                                                            |
+|                                            o  o            |
+|                                                            |
+|            x         ##%#               ###&&##            |
+|  ooo       x                         o             o       |
+| P   W                  ^^^       ^ ??                   G  |
+|##########   #######    ####################################|
+|##########ttt#######    ####################################|
+
+[II. The Floor Lies]
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                   o  o              o           o              |
+|             ##%                   ##&&             ###                    ##   |
+|                 x                                        o             x       |
+| P                                                                           G  |
+|##########%%##&&####  %%#########%%#####    ######&&##########  %%##############|
+|####################tt^^################    ##################^^tt##############|
+
+[III. The Gaps Lie]
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                           ~o~                                  |
+|               o                           ~~~                 x                |
+|                         o            ~~                o                       |
+| P                                                                           G  |
+|##########~~~   ~~~~##########  ~  ~  ~~##########~~~~~  ~ ~####################|
+|##########          ##########          ##########          ####################|
+
+[IV. Nothing Holds]
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                          ###                                   |
+|            x  o                 x   o               o  x                       |
+|                                                                                |
+|                                                                                |
+| P                                                                           G  |
+|##########ccccc###############cc#cccc#############cccc%ccc  ####################|
+|##########     ###############       #############          ####################|
+
+[V. The Gauntlet]
+|                                                                                          |
+|                                                                                          |
+|                                                                                          |
+|                                                                                          |
+|                                                                                          |
+|                                                                                          |
+|                                                                                          |
+|                                                                                          |
+|                                                                                          |
+|                                                                                          |
+|                                                                                          |
+|                                                                                          |
+|                                                                                       G  |
+|                                                                                      ####|
+|                                                                         o                |
+|               o           x                         o                     x              |
+|                           &&                                                             |
+| P          ??                                !                                           |
+|##########  ##  ####ccccccc### ~  ~ ######%%######  ########cc#cc#####    #########%%#####|
+|##########  ##  ####       ###      ######tt######  ?????###     tt###    #########tt#####|

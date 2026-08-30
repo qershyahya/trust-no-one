@@ -11,7 +11,7 @@ Starts one process that does three things:
 What plays on the page is steps/stepNN.py running in CPython right here -- the
 same file the page prints. Switching step swaps which file runs.
 
-Keys: arrows/WASD move, Space jumps, click throws a pebble, R restarts.
+Keys: arrows/WASD move, Space jumps, click throws a pebble, space restarts a finished run.
 Stop it with Ctrl+C.
 """
 import ast
@@ -46,7 +46,9 @@ PORT = int(os.environ.get("LESSON_PORT", "8756"))
 BUILD = str(time.time())   # changes when the server restarts, so an open page can refresh itself
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")   # render into memory, never onto a window
-os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
+# the audio driver is deliberately NOT forced to dummy: from step 46 the game makes sound,
+# and the lesson should let you hear it. A machine with no sound card still works -- the
+# step files catch that and play on in silence.
 sys.path.insert(0, STEPS_DIR)
 
 try:
@@ -158,6 +160,9 @@ class Runner:
             try:
                 mod = importlib.import_module(name)
                 mod = importlib.reload(mod)         # a fresh game every time
+                if pygame.mixer.get_init():
+                    pygame.mixer.stop()             # the last step's music does not carry over
+                stage(mod, self.step)               # and put it where the step can be seen
                 pygame.event.clear()
                 self.error = ""
                 self.fails = 0
@@ -177,6 +182,95 @@ class Runner:
         pygame.display.flip = _flip_and_capture     # every rendered frame lands in the stream
         pygame.key.get_pressed = lambda: self.keys
         threading.Thread(target=self.loop, daemon=True).start()
+
+
+# Where to put the running game so a step can actually be seen. The file on the left is
+# never touched -- this only walks the game to the spot you would have walked it to.
+#   level: which of the five to load   at: (column, row)   cursed: after the wizard
+STAGE = {
+    20: dict(at=(36, 17),
+             note="two squares from the first coin, on the far side of the pit -- otherwise"
+                  " it is a thirty-seven column run and a jump to reach one."),
+    21: dict(at=(31, 17),
+             note="three squares from the only spike in the level, which is otherwise a long"
+                  " way past the pit."),
+    27: dict(at=(13, 17),
+             note="beside the coin that kills, with the wizard two squares to your right --"
+                  " take the curse first, then find out what that coin was."),
+    28: dict(at=(27, 17),
+             note="three squares from the floor that is never drawn. Walk right onto nothing."),
+    29: dict(at=(38, 17),
+             note="two squares from the crumbling bricks, which are otherwise thirty-nine"
+                  " columns and a pit away."),
+    30: dict(at=(44, 17),
+             note="between the exit that lies and the one that does not -- both on screen at"
+                  " once from here."),
+    32: dict(at=(13, 17), cursed=True,
+             note="cursed, beside the rolled bricks. Throw stones at them, press R, and throw"
+                  " again: the roll changes, but one of them is always solid."),
+    33: dict(level=0, at=(54, 17),
+             note="three squares from the way out of level I, so you can see what reaching it"
+                  " now does."),
+    35: dict(level=4, at=(5, 17), cursed=True,
+             note="on the windiest level, cursed -- which is the only way the wind is anything"
+                  " but zero. Stand still and you still move."),
+    37: dict(level=3, at=(12, 13), cursed=True,
+             note="in the air above a coin that kills, on level IV. You die on the way down,"
+                  " and the body keeps falling to the floor."),
+    38: dict(level=0, at=(39, 17),
+             note="with a coin one square away and a spike a few to the left, so a jump, a"
+                  " coin, a thrown stone and a death are all within a few seconds."),
+    44: dict(level=1, at=(26, 17), cursed=True,
+             note="on level II with nine solid squares under you, so you can walk and watch"
+                  " the two background layers move at different speeds."),
+    45: dict(level=4, at=(28, 17),
+             note="one throw from here reveals a fire and a hole in the same handful of"
+                  " squares, with rubble to your left and a stone ledge to your right."
+                  " (Not cursed, so the wind cannot walk you into the gap while you look.)"),
+    46: dict(level=4, at=(44, 17),
+             note="on level V, two squares from the exit that lies. Throw a stone at it and"
+                  " watch which door it really is. (Not cursed here, so the wind cannot walk"
+                  " you into it while you read.)"),
+    50: dict(level=0, at=(31, 17), cursed=True,
+             note="a few squares from the spike on level I. Walk into it and watch her go"
+                  " down where she lands."),
+    56: dict(level=1, at=(58, 17), cursed=True,
+             note="cursed, on level II with a coin directly overhead: one press of space clears"
+                  " the title card (there is no wizard on this level, so the story has nowhere"
+                  " to go), then space is a jump sound and a coin sound, a click is a stone,"
+                  " and the pit four squares right is the last one."),
+    52: dict(level=0, at=(9, 17),
+             note="in front of the wizard, before the story exists. He is only breathing"
+                  " -- nothing has triggered his other two animations yet."),
+}
+
+
+def stage(mod, n):
+    """Nudge the running game to where this step's change can be seen. Wraps whatever the
+    step uses to set itself up, so it happens after the game is ready and again on restart.
+    reset() only exists from step 22 on; before that a step sets itself up in load()."""
+    spot = STAGE.get(n)
+    if not spot:
+        return
+    name = "reset" if hasattr(mod, "reset") else "load"
+    real = getattr(mod, name, None)
+    if real is None:
+        return
+    # load() only takes a level number from step 33 on, when there is more than one level
+    pick_level = "level" in spot and name == "reset" and mod.load.__code__.co_argcount > 0
+
+    def staged(*args, **kw):
+        real(*args, **kw)
+        if pick_level:
+            mod.load(spot["level"])
+        if spot.get("cursed") and hasattr(mod, "cursed"):
+            mod.cursed, mod.wizard = True, False
+        if "lives" in spot and hasattr(mod, "lives"):
+            mod.lives = spot["lives"]
+        c, r = spot["at"]
+        mod.P.update(x=float(c * mod.TILE), y=float(r * mod.TILE), vx=0.0, vy=0.0)
+
+    setattr(mod, name, staged)
 
 
 RUN = Runner()
@@ -459,6 +553,8 @@ def step_payload(n):
         rows.append({"kind": "del", "n": "-", "text": gone, "ids": [], "from": None})
 
     meta = dict(STEP_TEXT[n])
+    if n in STAGE:                                  # say where the game has been put
+        meta["trial"] = meta["trial"] + " <b>You start</b> " + STAGE[n]["note"]
     meta.update(title=TITLES[n - 1], last=LAST, step=n,
                 file="steps" + SEP + "step%02d.py" % n,
                 folder=HERE, lines=rows, total=len(now), code_lines=len(now_code),

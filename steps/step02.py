@@ -1,22 +1,37 @@
 """Trust No One -- step 2: A box on the screen.   Run it:  python3 steps/step02.py"""
 
-import sys   # sys is Python's own settings; this game uses
 import pygame   # the game library itself
 
-VW, VH = 960, 640   # the window, in pixels
+VW, VH = 960, 640                     # the window, in pixels
 
 # player width and height, in pixels. Smaller than a 32-pixel tile, on purpose
 PW, PH = 20, 28                       # how big you are
 
-# a dictionary: four numbers, each with a name. x and y are where; vx and vy are how fast, per
-# frame
-P = {"x": 64.0, "y": 288.0, "vx": 0.0, "vy": 0.0}     # where you are, and how fast
+# where you start, in pixels. From step 7 the level says where
+SPAWN = (64, 288)                                     # where you start
+# your position and speed, filled in by place()
+P = {}                                                # where you are, and how fast
+
+# a whole fresh run: wizard back, curse off, coins zero
+def reset():
+    """A whole fresh run: everything back to the beginning."""
+    # back to the start
+    place()
+
+# stand at the start of the level, costing nothing. Loading a level wants this; dying wants
+# die()
+def place():
+    """At the start of the level, standing still."""
+    # start where the level says, standing still
+    P.update(x=float(SPAWN[0]), y=float(SPAWN[1]), vx=0.0, vy=0.0)
 
 def main():   # the whole game lives in here
     pygame.init()   # wake the library up
     scr = pygame.display.set_mode((VW, VH))   # make the window
     pygame.display.set_caption("Trust No One")   # the title on the window bar
     clk = pygame.time.Clock()   # our metronome
+    # a whole fresh run -- which, right now, means standing at the start
+    reset()
     while True:   # the game loop
         for e in pygame.event.get():   # everything that happened since the last frame
             if e.type == pygame.QUIT:   # the X button on the window

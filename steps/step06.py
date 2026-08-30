@@ -1,13 +1,14 @@
 """Trust No One -- step 6: Drawing the world.   Run it:  python3 steps/step06.py"""
 
-import sys   # sys is Python's own settings; this game uses
 import pygame   # the game library itself
 
-TILE, VW, VH = 32, 960, 640   # TILE is the size of one square, in pixels
+VW, VH = 960, 640                     # the window, in pixels
+TILE = 32                             # one square of the world
 
-SPD = 3.6                             # top walking speed, pixels per frame
-GRAV, MAXFALL = 0.35, 12              # pull per frame, and the fastest you may fall
 PW, PH = 20, 28                       # how big you are
+SPD = 3.6                             # top walking speed, pixels per frame
+GRAV = 0.35                           # pull per frame
+MAXFALL = 12                          # the fastest you may fall
 
 # every tile is one letter: '#' brick  'G' exit  'P' spawn
 ROW = " " * 60                       # one empty row, so the sky is not 13 lines of spaces
@@ -21,16 +22,30 @@ L1 = [   # the level
     "############################################################",
     "############################################################",
 ]
+LEVELS = [L1]                          # the levels, in order: one so far
 
 LVL, COLS, ROWS = [], 0, 0                            # the level, once it is measured
-P = {"x": 64.0, "y": 288.0, "vx": 0.0, "vy": 0.0}     # where you are, and how fast
+level = 0                                             # which level is loaded
+SPAWN = (64, 288)                                     # where you start
+P = {}                                                # where you are, and how fast
 
-def load():   # get the level ready to play
-    """Pad every row to the same width, so LVL[r][c] never runs off the end."""
-    global LVL, COLS, ROWS   # change the variables outside this function
-    COLS = max(len(r) for r in L1)   # the widest row sets the width of the world
-    LVL = [r.ljust(COLS) for r in L1]   # pad every row to that width
+def load(i):   # load takes a number now: which level to start
+    """Take level i, measure it, find where you start, and stand there."""
+    global LVL, COLS, ROWS, level
+    level = i
+    rows = LEVELS[i]   # the level asked for, as its list of strings
+    COLS = max(len(r) for r in rows)
+    LVL = [r.ljust(COLS) for r in rows]   # pad every row to the same width
     ROWS = len(LVL)   # and the number of rows is the height
+    place()   # back to the start
+
+def reset():   # a whole fresh run
+    """A whole fresh run: everything back to the beginning."""
+    load(0)   # the first level
+
+def place():   # stand at the start of the level
+    """At the start of the level, standing still."""
+    P.update(x=float(SPAWN[0]), y=float(SPAWN[1]), vx=0.0, vy=0.0)   # start where the level
 
 def tile(c, r):   # what letter is at column c, row r?
     """What letter is at column c, row r? Off the map counts as empty air."""
@@ -43,8 +58,9 @@ def step(left, right):   # one frame of you
     P["x"] += P["vx"]
     P["y"] += P["vy"]
 
-# letter to colour. The entire art department
-LOOK = {"#": (150, 110, 70), "G": (90, 230, 190)}
+# every letter the game will ever have, and the colour it is drawn in. Assigned once
+LOOK = {"#": (150, 110, 70), "%": (150, 110, 70), "c": (150, 110, 70),
+        "^": (170, 170, 180), "t": (170, 170, 180), "o": (240, 200, 60), "x": (240, 200, 60)}
 
 # everything you see, rebuilt from nothing every frame
 def draw(scr):
@@ -55,22 +71,30 @@ def draw(scr):
         # ...every column
         for c in range(COLS):
             ch = LVL[r][c]
+            # air: nothing to draw
             if ch == " ":
                 continue
             # grid to pixels: where that square lands on screen
             box = pygame.Rect(c * TILE, r * TILE, TILE, TILE)
-            # fill it with the colour for that letter
-            pygame.draw.rect(scr, LOOK[ch], box)
-            # the last argument is a line width, so this draws only the outline
-            pygame.draw.rect(scr, (0, 0, 0), box, 1)
-    pygame.draw.rect(scr, (240, 235, 220), (int(P["x"]), int(P["y"]), PW, PH), border_radius=4)
+            # every kind of brick, including the ones that lie. They all look the same, on
+            # purpose
+            if ch in "#%~c":
+                # the colour this letter is drawn in
+                col = LOOK[ch]
+                pygame.draw.rect(scr, col, box)
+                # the last argument is a line width, so this draws only the outline
+                pygame.draw.rect(scr, (0, 0, 0), box, 1)
+                continue
+    # where you are, as whole pixels
+    x, y = int(P["x"]), int(P["y"])
+    pygame.draw.rect(scr, (240, 235, 220), (x, y, PW, PH), border_radius=4)
 
 def main():   # the whole game lives in here
     pygame.init()   # wake the library up
     scr = pygame.display.set_mode((VW, VH))   # make the window
     pygame.display.set_caption("Trust No One")   # the title on the window bar
     clk = pygame.time.Clock()   # our metronome
-    load()   # build the level before the loop starts
+    reset()   # a whole fresh run
     while True:   # the game loop
         for e in pygame.event.get():   # everything that happened since the last frame
             if e.type == pygame.QUIT:   # the X button on the window

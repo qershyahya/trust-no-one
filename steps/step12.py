@@ -1,13 +1,16 @@
 """Trust No One -- step 12: Falling out of the world.   Run it:  python3 steps/step12.py"""
 
-import sys   # sys is Python's own settings; this game uses
 import pygame   # the game library itself
 
-TILE, VW, VH = 32, 960, 640   # TILE is the size of one square, in pixels
+VW, VH = 960, 640                     # the window, in pixels
+TILE = 32                             # one square of the world
 
-SPD = 3.6                             # top walking speed, pixels per frame
-GRAV, MAXFALL = 0.35, 12              # pull per frame, and the fastest you may fall
 PW, PH = 20, 28                       # how big you are
+SPD = 3.6                             # top walking speed, pixels per frame
+GRAV = 0.35                           # pull per frame
+MAXFALL = 12                          # the fastest you may fall
+# five hearts; lives counts down from this
+LIVES = 5                             # how many you start with
 
 # every tile is one letter: '#' brick  'G' exit  'P' spawn
 ROW = " " * 60                       # one empty row, so the sky is not 13 lines of spaces
@@ -16,37 +19,70 @@ L1 = [   # the level
     ROW,
     ROW,
     "                      ####               ######             ",
-    ROW,
-    " P                                                       G  ",
-    "############################################################",
-    "############################################################",
+    "        #                                                   ",
+    " P      #                                                G  ",
+    "####  ######################################################",
+    "####  ######################################################",
 ]
+LEVELS = [L1]                          # the levels, in order: one so far
 
-LVL, COLS, ROWS, SPAWN = [], 0, 0, (0, 0)
-P = {}
+LVL, COLS, ROWS = [], 0, 0                            # the level, once it is measured
+level = 0                                             # which level is loaded
+SPAWN = (0, 0)                                        # where you start, found by load()
+P = {}                                                # where you are, and how fast
+# how many you have left, right now
+lives = LIVES
+over = False                                          # the run is finished
 
-def load():   # get the level ready to play
-    """Measure the level, find the P, then erase it so it is never drawn."""
-    global LVL, COLS, ROWS, SPAWN   # change the variables outside this function
-    COLS = max(len(r) for r in L1)   # the widest row sets the width of the world
-    LVL = [r.ljust(COLS) for r in L1]   # pad every row to that width
+def load(i):   # load takes a number now: which level to start
+    """Take level i, measure it, find where you start, and stand there."""
+    global LVL, COLS, ROWS, level, SPAWN
+    level = i
+    rows = LEVELS[i]   # the level asked for, as its list of strings
+    COLS = max(len(r) for r in rows)
+    LVL = [r.ljust(COLS) for r in rows]   # pad every row to the same width
     ROWS = len(LVL)   # and the number of rows is the height
     SPAWN = next((c * TILE, r * TILE) for r in range(ROWS) for c in range(COLS) if LVL[r][c] == "P")
     LVL = [r.replace("P", " ") for r in LVL]   # then erase it
-    # back to the start
-    die()
+    place()   # back to the start
+
+def reset():   # a whole fresh run
+    """A whole fresh run: everything back to the beginning."""
+    global lives, over
+    # how many you have left, right now
+    lives = LIVES
+    # true when the last heart has gone, and the run is finished
+    over = False
+    load(0)   # the first level
+
+def place():   # stand at the start of the level
+    """At the start of the level, standing still."""
+    P.update(x=float(SPAWN[0]), y=float(SPAWN[1]), vx=0.0, vy=0.0)   # start where the level
+
 
 # back to the start, standing still
 def die():
-    """Back to the start, standing still."""
-    P.update(x=float(SPAWN[0]), y=float(SPAWN[1]), vx=0.0, vy=0.0)   # start where the level
+    """Being killed. It costs a life, and the last one ends the run."""
+    global lives, over
+    # one heart, spent
+    lives -= 1
+    # that was the last one
+    if lives <= 0:
+        # nothing moves again until you ask for a new run
+        over = True
+        # put the body down and stop
+        return place()
+    # back to the start
+    place()
 
 def tile(c, r):   # what letter is at column c, row r?
     """What letter is at column c, row r? Off the map counts as empty air."""
     return LVL[r][c] if 0 <= r < ROWS and 0 <= c < COLS else " "   # off the edge of the map
 
 def solid(ch):   # which letters stop you
-    return ch == "#"
+    """Which letters stop you. Floor you cannot see and bricks that crumble are floor;
+    a hologram is floor only until you are cursed."""
+    return ch in "#~c"
 
 def prect():   # your box, right now, as a Rect
     """Your box, right now."""
@@ -56,11 +92,14 @@ def cells(rect):   # every tile a box overlaps
     """Every tile this box overlaps -- usually two to six of them."""
     for r in range(rect.top // TILE, (rect.bottom - 1) // TILE + 1):   # the -1 means touching
         for c in range(rect.left // TILE, (rect.right - 1) // TILE + 1):
-            ch = tile(c, r)
+            ch = tile(c, r)   # what is written in the square it has reached
             if ch != " ":
                 yield c, r, ch   # hand them back one at a time as the loop asks
 
 def step(left, right):   # one frame of you
+    # the run is finished: a card over everything, and draw stops here
+    if over: return                               # the run is finished
+
     P["vx"] = (right - left) * SPD   # True minus False is 1 minus 0
     P["vy"] = min(P["vy"] + GRAV, MAXFALL)   # add gravity every frame
 
@@ -71,6 +110,7 @@ def step(left, right):   # one frame of you
             if P["vx"] > 0: r.right = c * TILE   # moving right
             elif P["vx"] < 0: r.left = (c + 1) * TILE   # moving left: the other face
             P["x"] = float(r.x); P["vx"] = 0.0   # stop dead, or you keep pressing into it
+    P["x"] = min(max(P["x"], 0.0), COLS * TILE - PW)   # the level has two ends
 
     P["y"] += P["vy"]
     r = prect()   # where that move put you
@@ -82,33 +122,41 @@ def step(left, right):   # one frame of you
 
     # fell past the bottom row
     if P["y"] > ROWS * TILE:
-        # back to the start
-        die()
+        # back to the start, and nothing else this frame
+        return die()
 
-LOOK = {"#": (150, 110, 70), "G": (90, 230, 190)}
+LOOK = {"#": (150, 110, 70), "%": (150, 110, 70), "c": (150, 110, 70),
+        "^": (170, 170, 180), "t": (170, 170, 180), "o": (240, 200, 60), "x": (240, 200, 60)}
 
 def draw(scr):   # everything you see
     scr.fill((25, 25, 35))   # paint over the last frame, or it smears
     for r in range(ROWS):   # every row
         for c in range(COLS):   # ...every column
             ch = LVL[r][c]
-            if ch == " ":
+            if ch == " ":   # air: nothing to draw
                 continue
             box = pygame.Rect(c * TILE, r * TILE, TILE, TILE)   # grid to pixels
-            pygame.draw.rect(scr, LOOK[ch], box)   # fill it with the colour for that letter
-            pygame.draw.rect(scr, (0, 0, 0), box, 1)   # the last argument is a line width
-    pygame.draw.rect(scr, (240, 235, 220), (int(P["x"]), int(P["y"]), PW, PH), border_radius=4)
+            if ch in "#%~c":
+                col = LOOK[ch]   # the colour this letter is drawn in
+                pygame.draw.rect(scr, col, box)
+                pygame.draw.rect(scr, (0, 0, 0), box, 1)   # the last argument is a line width
+                continue
+    x, y = int(P["x"]), int(P["y"])   # where you are, as whole pixels
+    pygame.draw.rect(scr, (240, 235, 220), (x, y, PW, PH), border_radius=4)
 
 def main():   # the whole game lives in here
     pygame.init()   # wake the library up
     scr = pygame.display.set_mode((VW, VH))   # make the window
     pygame.display.set_caption("Trust No One")   # the title on the window bar
     clk = pygame.time.Clock()   # our metronome
-    load()   # build the level before the loop starts
+    reset()   # a whole fresh run
     while True:   # the game loop
         for e in pygame.event.get():   # everything that happened since the last frame
             if e.type == pygame.QUIT:   # the X button on the window
                 return
+            if e.type == pygame.KEYDOWN:
+                # space on the game over screen: a whole new run
+                if over and e.key == pygame.K_SPACE: reset()
         k = pygame.key.get_pressed()   # which keys are held down right now
         step(k[pygame.K_LEFT] or k[pygame.K_a], k[pygame.K_RIGHT] or k[pygame.K_d])
         draw(scr)   # one call now does all the drawing

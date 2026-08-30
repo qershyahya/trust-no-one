@@ -1,7 +1,7 @@
 # Trust No One
 
 A platformer where the level lies to you — and a lesson that builds it in front of you,
-**one line at a time**, in 37 steps.
+**one line at a time**, in 57 steps.
 
 Open the lesson and you get one screen: the Python file on the left, and that exact file
 **running** on the right. Not a video, not a copy — step 14 is `steps\step14.py`, playing.
@@ -96,11 +96,11 @@ python3 main.py
 │  green  = added at this step  │   ← →  walk              │
 │  red    = removed here        │   Space jump             │
 │  green italic = a comment     │   click throw a pebble   │
-│                               │   R restart              │
+│                               │                          │
 └───────────────────────────────┴──────────────────────────┘
 ```
 
-- **The step strip along the top** jumps to any of the 37 steps.
+- **The step strip along the top** jumps to any of the 57 steps.
 - **Hover any name** in the code — `GRAV`, `prect`, `min`, `blit` — and it tells you what it
   means. Abbreviations are spelled out; functions show what goes in and what comes out,
   *as they are at that step*.
@@ -122,7 +122,9 @@ change a number, run it again. That is the whole loop of making a game.
 ```bat
 py steps\step07.py     :: floors and walls
 py steps\step14.py     :: the jump
-py steps\step37.py     :: the finished game
+py steps\step38.py     :: sound, out of arithmetic
+py steps\step46.py     :: the whole game, in shapes
+py steps\step57.py     :: the finished game, with the art and the sound
 ```
 
 Things worth breaking: make `GRAV` 0.1, make `JUMP` -20, set `CRUMB` to 5, or change a `#` in
@@ -144,31 +146,20 @@ that moment the level is not what it looks like:
 | `o` | a coin | a coin |
 | `x` | a coin | it kills you |
 | `~` | nothing | floor |
-| `c` | a brick | it breaks after half a second |
+| `c` | a brick | it wobbles, drops away, and builds itself back |
 | `G` | the exit | the exit |
 | `!` | the exit | it throws you back to the start |
 
 **Throw a pebble** at anything you do not trust. Whatever it hits is drawn in its true colour
-from then on. That is your only way of telling them apart — and `?` and `&` are rolled fresh
+**for half a second**, and every square it wakes up wobbles -- so an honest brick answers you
+too. Then the level goes back to lying. That is your only way of telling them apart — and `?` and `&` are rolled fresh
 every run, so a level cannot be memorised.
 
-Five levels, each built on a different lie.
+Five levels, each built on a different lie. Five lives, and the wind gets stronger and
+turns around faster as you go.
 
----
-
-## The robot
-
-You cannot hand-test twelve dice rolls across five levels before a jam deadline, so the game
-tests itself, with no window at all:
-
-```bat
-py steps\step37.py --test
-```
-
-It plays itself with fake key presses and checks the answers — that a tap hops lower than a
-held jump, that a hologram drops you once cursed, that invisible floor still holds you, and
-that **no roll of the dice can ever produce a hole nobody could jump**. It prints one word,
-`ok`, or stops on the line that is wrong and tells you which seed broke it.
+The first 38 steps build every rule of it out of coloured shapes, with nothing installed but
+pygame. The last 19 put the art and the sound on top, one picture at a time.
 
 ---
 
@@ -181,8 +172,10 @@ that **no roll of the dice can ever produce a hole nobody could jump**. It print
 | `main.py` | the lesson: runs the game, streams it to the page, serves the page |
 | `lesson.html` | the page itself |
 | `lesson_text.py` | what the lesson says: the prose, the line notes, the hover hints |
-| `build_steps.py` | writes the 37 step files |
-| `steps\step01.py` … `step37.py` | the lesson, as runnable programs. `step37.py` is the finished game |
+| `build_steps.py` | writes the 57 step files |
+| `steps\step01.py` … `step57.py` | the lesson, as runnable programs. `step57.py` is the finished game |
+| `art\` | the pictures and sounds, from step 47 on |
+| `levels.txt` | the five levels as text, written on the first run. Edit it and the game plays what you wrote |
 
 The step files are **generated**. Every piece of the program is written down once, in
 `build_steps.py`, which knows what that piece looks like at each step — so no two steps can
@@ -192,8 +185,8 @@ drift apart. Rebuild them any time:
 py build_steps.py
 ```
 
-It refuses to finish unless the last step still plays the whole game correctly, which it
-checks by making it play itself.
+Every file is compiled before it is written, so a step that would not even start never
+reaches you.
 
 ## If something goes wrong
 
@@ -207,4 +200,25 @@ checks by making it play itself.
 
 ---
 
-Made for a game jam, and for one student.
+## Credits
+
+Made for the **Brackeys Game Jam**, theme **Trust No One** — and for one student.
+
+The art and the sound in `art/` are other people's work, used under their own licences.
+Every one of them is free, and every one is listed with a link in **[CREDITS.md](CREDITS.md)**:
+
+- **Anokolisa** — [Moon Graveyard](https://anokolisa.itch.io/moon-graveyard): the tiles and both background layers
+- **LuizMelo** — [Huntress](https://luizmelo.itch.io/huntress) and [Evil Wizard](https://luizmelo.itch.io/evil-wizard): the player and the wizard
+- **LizCheong** — [Pixel Portal](https://lizcheong.itch.io/pixel-portal): the two doors
+- **DevKidd** — [Pixel Fire Asset Pack](https://devkidd.itch.io/pixel-fire-asset-pack): the fire and the smoke
+- **La Red Games** — [Gems & Coins](https://laredgames.itch.io/gems-coins-free): the coins
+- **ItsBaydev** — [PixelArt Rocks](https://itsbaydev.itch.io/pixelart-rocks): the stone you throw
+- **Brackeys** — [Platformer Bundle](https://brackeysgames.itch.io/brackeys-platformer-bundle): the slime, and six of the sounds
+- **Zerie** — [Tiny RPG Character Asset Pack 02](https://zerie.itch.io/tiny-rpg-character-asset-pack-02): what waits in the wrong door
+- **Vryell** — [Controller & Keyboard Icons](https://vryell.itch.io/controller-keyboard-icons): the key icons
+
+Everything else you hear — the trampoline, the throw, the stone landing, the brick
+cracking, the wind, and four bars of A minor — is written as arithmetic in the lesson
+itself, from step 46 on.
+
+Code by **qershyahya**. This is our first game.
